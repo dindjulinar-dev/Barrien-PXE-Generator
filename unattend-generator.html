@@ -1,0 +1,1369 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Générateur unattend.xml — Windows Setup Answer File</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0e13;
+  --bg-grid: rgba(94,234,212,0.035);
+  --panel:#10161e;
+  --panel-2:#161e29;
+  --panel-3:#1c2531;
+  --line:#243042;
+  --line-soft:#1a2330;
+  --text:#e7ecf1;
+  --muted:#8694a6;
+  --muted-2:#5d6b7d;
+  --accent:#5eead4;
+  --accent-dim:#2c6e63;
+  --accent-glow: rgba(94,234,212,0.18);
+  --warn:#ff8a4a;
+  --warn-dim:#7a4324;
+  --danger:#ff6b6b;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+  --sans: 'Inter', system-ui, sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(ellipse 1200px 600px at 15% -10%, rgba(94,234,212,0.06), transparent 60%),
+    radial-gradient(ellipse 900px 700px at 110% 10%, rgba(255,138,74,0.05), transparent 55%),
+    var(--bg);
+  color:var(--text);
+  font-family:var(--sans);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{background:var(--accent); color:#06110f;}
+a{color:var(--accent);}
+.skip{position:absolute;left:-9999px;}
+.skip:focus{left:8px; top:8px; background:var(--accent); color:#06110f; padding:8px 12px; border-radius:6px; z-index:999;}
+
+/* ---------- Top bar / boot strip ---------- */
+header.top{
+  position:sticky; top:0; z-index:40;
+  background:rgba(10,14,19,0.92);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.top-inner{
+  max-width:1480px; margin:0 auto; padding:14px 22px 12px;
+  display:flex; flex-direction:column; gap:12px;
+}
+.brand-row{display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+.brand{display:flex; align-items:center; gap:12px;}
+.brand .mark{
+  width:34px; height:34px; border-radius:7px;
+  background:linear-gradient(135deg, var(--accent), #2a9d8f);
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--mono); font-weight:800; color:#06110f; font-size:15px;
+  box-shadow:0 0 24px var(--accent-glow);
+  flex-shrink:0;
+}
+.brand h1{
+  font-family:var(--mono); font-size:15px; letter-spacing:0.02em; margin:0;
+  font-weight:700; color:var(--text);
+}
+.brand p{margin:1px 0 0; font-size:11.5px; color:var(--muted); font-family:var(--mono);}
+.top-actions{display:flex; gap:8px; align-items:center;}
+.btn{
+  font-family:var(--mono); font-size:12.5px; font-weight:600;
+  border:1px solid var(--line); background:var(--panel-2); color:var(--text);
+  padding:9px 14px; border-radius:7px; cursor:pointer; letter-spacing:0.01em;
+  display:inline-flex; align-items:center; gap:7px; transition:.15s ease; white-space:nowrap;
+}
+.btn:hover{border-color:var(--accent); color:var(--accent); background:var(--panel-3);}
+.btn:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
+  outline:2px solid var(--accent); outline-offset:2px;
+}
+.btn.primary{background:var(--accent); color:#06110f; border-color:var(--accent);}
+.btn.primary:hover{background:#7ff4de; color:#06110f;}
+.btn.ghost{background:transparent;}
+
+/* boot progress strip — the signature element */
+.boot-strip{display:flex; gap:4px; align-items:center;}
+.boot-seg{
+  flex:1; height:6px; border-radius:3px; background:var(--line-soft);
+  position:relative; overflow:hidden; cursor:pointer;
+}
+.boot-seg[data-done="1"]{background:var(--accent-dim);}
+.boot-seg[data-active="1"]{background:var(--line-soft);}
+.boot-seg[data-active="1"]::after{
+  content:""; position:absolute; inset:0; background:var(--accent);
+  animation:scan 1.6s ease-in-out infinite;
+}
+@keyframes scan{
+  0%{transform:translateX(-100%);}
+  50%{transform:translateX(0%);}
+  100%{transform:translateX(100%);}
+}
+.boot-seg[data-done="1"]:not([data-active="1"])::after{content:""; position:absolute; inset:0; background:var(--accent);}
+.boot-label{font-family:var(--mono); font-size:10.5px; color:var(--muted-2); white-space:nowrap;}
+
+@media (prefers-reduced-motion: reduce){
+  .boot-seg[data-active="1"]::after{animation:none; background:var(--accent); opacity:.5;}
+}
+
+/* ---------- Layout ---------- */
+.shell{
+  max-width:1480px; margin:0 auto; padding:22px;
+  display:grid; grid-template-columns:230px minmax(0,1fr) minmax(360px,540px); gap:18px;
+  align-items:start;
+}
+@media (max-width:1180px){
+  .shell{grid-template-columns:200px minmax(0,1fr); }
+  .preview-col{display:none;}
+  .preview-col.open{display:block; grid-column:1/-1;}
+}
+@media (max-width:760px){
+  .shell{grid-template-columns:1fr; padding:14px;}
+  .nav-col{order:2; position:static !important;}
+  .form-col{order:1;}
+  .preview-col.open{order:3;}
+}
+
+/* ---------- Nav ---------- */
+.nav-col{position:sticky; top:96px;}
+nav.steps{
+  background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:8px;
+  display:flex; flex-direction:column; gap:2px;
+}
+nav.steps button{
+  all:unset; cursor:pointer; padding:10px 11px; border-radius:7px;
+  display:flex; align-items:center; gap:10px; font-size:13px; color:var(--muted);
+  font-family:var(--sans); font-weight:500;
+}
+nav.steps button .n{
+  font-family:var(--mono); font-size:10.5px; color:var(--muted-2);
+  width:20px; flex-shrink:0;
+}
+nav.steps button:hover{background:var(--panel-2); color:var(--text);}
+nav.steps button[aria-current="true"]{background:var(--panel-3); color:var(--accent); box-shadow:inset 2px 0 0 var(--accent);}
+nav.steps button[aria-current="true"] .n{color:var(--accent);}
+.nav-mobile-toggle{display:none;}
+@media (max-width:760px){
+  nav.steps{flex-direction:row; overflow-x:auto; gap:6px;}
+  nav.steps button{flex-shrink:0; padding:8px 12px;}
+}
+
+/* ---------- Form column ---------- */
+.form-col{min-width:0;}
+.panel{
+  background:var(--panel); border:1px solid var(--line); border-radius:12px;
+  padding:24px 26px 26px; margin-bottom:16px;
+}
+.panel h2{
+  font-family:var(--mono); font-size:13px; letter-spacing:0.06em; text-transform:uppercase;
+  color:var(--accent); margin:0 0 4px; font-weight:700;
+}
+.panel .sub{font-size:13px; color:var(--muted); margin:0 0 20px; line-height:1.5; max-width:62ch;}
+.field{margin-bottom:16px;}
+.field:last-child{margin-bottom:0;}
+.field label.lab{
+  display:block; font-size:12.5px; font-weight:600; color:var(--text); margin-bottom:6px;
+}
+.field .hint{font-size:11.5px; color:var(--muted-2); margin-top:5px; line-height:1.5;}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+.row3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;}
+@media (max-width:560px){.row2,.row3{grid-template-columns:1fr;}}
+
+input[type=text], input[type=password], select, textarea{
+  width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--text);
+  padding:10px 12px; border-radius:7px; font-size:13.5px; font-family:var(--sans);
+}
+input[type=text]:focus, input[type=password]:focus, select:focus, textarea:focus{
+  border-color:var(--accent);
+}
+textarea{font-family:var(--mono); font-size:12.5px; min-height:90px; resize:vertical; line-height:1.5;}
+select{appearance:none; background-image:linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position:calc(100% - 18px) center, calc(100% - 13px) center; background-size:5px 5px, 5px 5px; background-repeat:no-repeat; padding-right:34px;}
+
+.pwd-wrap{position:relative;}
+.pwd-wrap button{
+  position:absolute; right:6px; top:50%; transform:translateY(-50%);
+  background:none; border:none; color:var(--muted); cursor:pointer; font-family:var(--mono);
+  font-size:10.5px; padding:5px 8px; border-radius:5px;
+}
+.pwd-wrap button:hover{color:var(--accent); background:var(--panel-3);}
+
+.toggle-row{
+  display:flex; align-items:flex-start; gap:12px; padding:12px 0;
+  border-top:1px solid var(--line-soft);
+}
+.toggle-row:first-of-type{border-top:none; padding-top:2px;}
+.toggle-row .meta{flex:1; min-width:0;}
+.toggle-row .meta .t{font-size:13.5px; font-weight:600; color:var(--text);}
+.toggle-row .meta .d{font-size:12px; color:var(--muted); margin-top:2px; line-height:1.5;}
+.switch{
+  position:relative; width:40px; height:23px; flex-shrink:0; margin-top:1px;
+}
+.switch input{position:absolute; opacity:0; inset:0; margin:0; cursor:pointer; width:100%; height:100%;}
+.switch .track{
+  position:absolute; inset:0; background:var(--panel-3); border:1px solid var(--line);
+  border-radius:999px; transition:.15s;
+}
+.switch .knob{
+  position:absolute; top:2px; left:2px; width:17px; height:17px; border-radius:50%;
+  background:var(--muted); transition:.15s;
+}
+.switch input:checked + .track{background:var(--accent-dim); border-color:var(--accent);}
+.switch input:checked + .track .knob{transform:translateX(17px); background:var(--accent);}
+.switch input:focus-visible + .track{outline:2px solid var(--accent); outline-offset:2px;}
+
+.tag-risky{
+  display:inline-block; font-family:var(--mono); font-size:9.5px; letter-spacing:.04em;
+  color:var(--warn); border:1px solid var(--warn-dim); background:rgba(255,138,74,0.08);
+  padding:1px 6px; border-radius:4px; margin-left:7px; vertical-align:middle; text-transform:uppercase;
+}
+
+.checklist{display:grid; grid-template-columns:1fr 1fr; gap:4px 16px;}
+@media (max-width:560px){.checklist{grid-template-columns:1fr;}}
+.chk{display:flex; align-items:center; gap:9px; padding:7px 0; font-size:13px; color:var(--text);}
+.chk input{width:16px; height:16px; accent-color:var(--accent); flex-shrink:0;}
+
+.radio-cards{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+@media (max-width:560px){.radio-cards{grid-template-columns:1fr;}}
+.rcard{
+  border:1px solid var(--line); background:var(--panel-2); border-radius:9px; padding:13px 14px;
+  cursor:pointer; display:flex; gap:10px; align-items:flex-start;
+}
+.rcard input{margin-top:3px; accent-color:var(--accent);}
+.rcard .t{font-size:13px; font-weight:600;}
+.rcard .d{font-size:11.5px; color:var(--muted); margin-top:2px; line-height:1.4;}
+.rcard:has(input:checked){border-color:var(--accent); background:rgba(94,234,212,0.05);}
+
+.note{
+  display:flex; gap:10px; align-items:flex-start; padding:12px 14px; border-radius:8px;
+  background:rgba(255,138,74,0.06); border:1px solid var(--warn-dim); font-size:12.5px; color:#f0c8a8;
+  line-height:1.55; margin-top:14px;
+}
+.note b{color:var(--warn);}
+.note.info{background:rgba(94,234,212,0.05); border-color:var(--accent-dim); color:#bfe9e1;}
+.note.info b{color:var(--accent);}
+
+.btn-add{
+  font-family:var(--mono); font-size:12px; color:var(--accent); background:none; border:1px dashed var(--accent-dim);
+  padding:8px 12px; border-radius:7px; cursor:pointer; width:100%; text-align:left;
+}
+.btn-add:hover{background:rgba(94,234,212,0.06);}
+.user-card{
+  border:1px solid var(--line); border-radius:9px; padding:14px; background:var(--panel-2); margin-bottom:10px;
+  position:relative;
+}
+.user-card .rm{
+  position:absolute; top:10px; right:10px; background:none; border:none; color:var(--muted-2);
+  cursor:pointer; font-size:11px; font-family:var(--mono);
+}
+.user-card .rm:hover{color:var(--danger);}
+
+footer.bottom{max-width:1480px; margin:0 auto; padding:6px 22px 50px; color:var(--muted-2); font-size:11.5px; font-family:var(--mono); text-align:center;}
+
+/* ---------- Preview column ---------- */
+.preview-col{position:sticky; top:96px;}
+.preview-panel{
+  background:#0d1218; border:1px solid var(--line); border-radius:12px; overflow:hidden;
+  display:flex; flex-direction:column; max-height:calc(100vh - 116px);
+}
+.preview-head{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:11px 14px; border-bottom:1px solid var(--line); background:var(--panel);
+}
+.preview-head .dots{display:flex; gap:6px;}
+.preview-head .dots span{width:9px; height:9px; border-radius:50%; background:var(--line);}
+.preview-head .ttl{font-family:var(--mono); font-size:11.5px; color:var(--muted); flex:1; text-align:center;}
+.preview-actions{display:flex; gap:6px;}
+.preview-actions button{
+  background:none; border:1px solid var(--line); color:var(--muted); font-family:var(--mono); font-size:10.5px;
+  padding:5px 9px; border-radius:6px; cursor:pointer;
+}
+.preview-actions button:hover{color:var(--accent); border-color:var(--accent);}
+pre#xmlout{
+  margin:0; padding:16px; overflow:auto; font-family:var(--mono); font-size:11.5px; line-height:1.65;
+  color:#c7d0db; flex:1; white-space:pre;
+}
+.tag{color:#7aa8c9;}
+.attr{color:#5eead4;}
+.val{color:#f0a868;}
+.cmt{color:var(--muted-2); font-style:italic;}
+
+.mobile-preview-btn{display:none;}
+@media (max-width:1180px){
+  .mobile-preview-btn{display:inline-flex;}
+}
+
+/* ---------- new: category headers, command list, edition presets ---------- */
+.cat-head{
+  font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--muted-2); margin:18px 0 4px; padding-top:10px; border-top:1px solid var(--line-soft);
+}
+.cat-head:first-child{margin-top:0; padding-top:0; border-top:none;}
+.apps-toolbar{display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;}
+
+.cmd-row{
+  border:1px solid var(--line); background:var(--panel-2); border-radius:9px; padding:12px; margin-bottom:10px;
+  display:flex; gap:10px; align-items:flex-start;
+}
+.cmd-row .cmd-main{flex:1; min-width:0; display:flex; flex-direction:column; gap:8px;}
+.cmd-row select{max-width:160px; flex-shrink:0;}
+.cmd-row textarea{min-height:46px; font-size:12px;}
+.cmd-row input.cmd-desc{font-size:11.5px; padding:7px 10px;}
+.cmd-row .rm{
+  background:none; border:none; color:var(--muted-2); cursor:pointer; font-family:var(--mono);
+  font-size:11px; padding:6px; flex-shrink:0;
+}
+.cmd-row .rm:hover{color:var(--danger);}
+.cmd-row .idx{font-family:var(--mono); font-size:10.5px; color:var(--muted-2); flex-shrink:0; width:22px; padding-top:9px;}
+
+.preset-row{display:flex; gap:10px; align-items:flex-end; margin-bottom:6px;}
+.preset-row .field{flex:1; margin-bottom:0;}
+</style>
+</head>
+<body>
+<a href="#main" class="skip">Aller au contenu</a>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand-row">
+      <div class="brand">
+        <div class="mark">XML</div>
+        <div>
+          <h1>unattend-builder</h1>
+          <p>générateur de fichier de réponse Windows Setup — autonome, hors-ligne</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button class="btn ghost mobile-preview-btn" id="togglePreview" type="button">aperçu ◇</button>
+        <button class="btn ghost" id="resetBtn" type="button">réinitialiser</button>
+        <button class="btn" id="copyBtn" type="button">copier le xml</button>
+        <button class="btn primary" id="downloadBtn" type="button">↓ autounattend.xml</button>
+      </div>
+    </div>
+    <div class="boot-strip" id="bootStrip" aria-hidden="true"></div>
+  </div>
+</header>
+
+<main id="main" class="shell">
+  <div class="nav-col">
+    <nav class="steps" id="stepsNav" aria-label="Sections de configuration"></nav>
+  </div>
+
+  <div class="form-col" id="formCol"></div>
+
+  <div class="preview-col" id="previewCol">
+    <div class="preview-panel">
+      <div class="preview-head">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <div class="ttl">autounattend.xml</div>
+        <div class="preview-actions">
+          <button id="copyBtn2" type="button">copier</button>
+        </div>
+      </div>
+      <pre id="xmlout"></pre>
+    </div>
+  </div>
+</main>
+
+<footer class="bottom">
+  généré localement dans votre navigateur — aucune donnée n'est envoyée à un serveur · compatible Windows 10 / 11, image de référence en plusieurs étapes (windowsPE → specialize → oobeSystem)
+</footer>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================== STATE ============================== */
+const defaultState = {
+  // 1 langue
+  uiLang:"fr-FR", inputLocale:"0409:00000409", systemLocale:"fr-FR", userLocale:"fr-FR", timezone:"Romance Standard Time", keyboardExtra:"",
+  // 2 disque
+  diskMode:"universal", // universal | gpt-only | mbr-only | manual
+  diskId:"0", recoveryPartition:true,
+  // 3 compat win11
+  bypassTPM:true, bypassSecureBoot:true, bypassRAM:true, bypassCPU:false, bypassStorage:false, bypassNRO:true,
+  // 4 edition
+  editionPreset:"", productKey:"", acceptEula:true, fullName:"Utilisateur", organization:"",
+  // 5 comptes
+  users:[{name:"Admin", password:"", group:"Administrators", displayName:""}],
+  autoLogonUser:"", autoLogonPassword:"", autoLogonCount:1, neverExpire:true, obscurePasswords:true,
+  // 6 ordinateur
+  computerName:"*", registeredOwner:"", workgroup:"WORKGROUP", joinDomain:false, domainName:"", domainOU:"", domainUser:"", domainPassword:"",
+  // 7 reseau
+  skipNetworkSetup:true, wifiEnabled:false, wifiSSID:"", wifiPassword:"", wifiHidden:false, disableNetworkDuringInstall:false,
+  // 8 confidentialite
+  privacy:{telemetry:true, advertisingId:true, locationTracking:true, cortana:true, tailoredExperiences:true, feedback:true, speechRecognition:true, activityHistory:true, startSuggestions:true, lockScreenTips:true, diagnosticData:true},
+  // 9 apps
+  removeApps:{
+    // multimédia
+    photos:true, camera:false, moviesTV:true, grooveMusic:true, paint3d:true, print3d:true, threeDViewer:true, soundRecorder:true, screenSketch:false,
+    // communication
+    mailCalendar:false, skype:true, teamsConsumer:true, people:true, yourPhone:true,
+    // jeux
+    xbox:true, solitaire:true,
+    // productivité
+    officeHub:true, oneNote:false, todo:true, stickyNotes:false, powerAutomate:true, whiteboard:true,
+    // utilitaires
+    maps:true, weather:true, news:true, alarms:false, getHelp:true, feedbackHub:true, tips:true, quickAssist:false, family:true, mixedReality:true, clipchamp:true, calculator:false,
+  },
+  removeOneDrive:false,
+  // 10 domaine déjà couvert au-dessus
+  // 11 scripts (liste dynamique illimitée)
+  customCommands:[],
+  // 12 divers
+  misc:{disableUAC:false, enableRDP:false, disableDefender:false, highPerf:true, disableHibernation:true, disableFastStartup:false, showFileExt:true, showHidden:false, darkMode:true, disableLockScreen:false, taskbarLeft:false, disableWidgets:true, disableCopilot:true},
+};
+
+let state = JSON.parse(JSON.stringify(defaultState));
+
+/* ============================== HELPERS ============================== */
+function esc(s){
+  if(s===undefined||s===null) return "";
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");
+}
+function b64(s){
+  try{ return btoa(unescape(encodeURIComponent(s))); }catch(e){ return btoa(s); }
+}
+// AutoLogon / local account passwords need the "Password" + "PlainText" wrapping per MS schema,
+// with the "obscure" convention of appending the field name before base64 (commonly used trick
+// to avoid storing fully plain values — still reversible, documented behavior).
+function pwdBlock(tag, plain, suffix){
+  if(state.obscurePasswords){
+    return `<${tag}><Value>${esc(b64(plain+suffix))}</Value><PlainText>false</PlainText></${tag}>`;
+  }
+  return `<${tag}><Value>${esc(plain)}</Value><PlainText>true</PlainText></${tag}>`;
+}
+
+function uniq(arr){return arr.filter(Boolean);}
+
+/* ============================== SECTIONS DEFINITION ============================== */
+const SECTIONS = [
+  {id:"lang", label:"Langue & région"},
+  {id:"disk", label:"Disque"},
+  {id:"compat", label:"Compatibilité Win11"},
+  {id:"edition", label:"Édition & licence"},
+  {id:"accounts", label:"Comptes utilisateurs"},
+  {id:"computer", label:"Ordinateur & domaine"},
+  {id:"network", label:"Réseau & Wi-Fi"},
+  {id:"privacy", label:"Confidentialité"},
+  {id:"apps", label:"Applications"},
+  {id:"scripts", label:"Commandes personnalisées"},
+  {id:"misc", label:"Système & interface"},
+  {id:"export", label:"Export"},
+];
+let activeSection = "lang";
+const touched = new Set();
+
+/* ============================== XML BUILDER ============================== */
+function buildXML(){
+  const passes = {windowsPE:[], offlineServicing:[], generalize:[], specialize:[], auditSystem:[], auditUser:[], oobeSystem:[]};
+
+  /* ---- windowsPE: international core ---- */
+  passes.windowsPE.push(`
+    <component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <SetupUILanguage><UILanguage>${esc(state.uiLang)}</UILanguage></SetupUILanguage>
+      <InputLocale>${esc(state.inputLocale)}</InputLocale>
+      <SystemLocale>${esc(state.systemLocale)}</SystemLocale>
+      <UILanguage>${esc(state.uiLang)}</UILanguage>
+      <UserLocale>${esc(state.userLocale)}</UserLocale>
+    </component>`);
+
+  /* ---- windowsPE: setup (disk, bypass, product key, network during install) ---- */
+  // IMPORTANT: the Windows partition must always be created LAST with no explicit size
+  // (it claims whatever space remains). If Recovery were created AFTER Windows, there
+  // would be zero space left for it and diskpart/Setup would fail outright — this was
+  // the actual cause of "Windows n'a pas pu appliquer le paramètre de démarrage Windows PE
+  // spécifié...". Recovery (fixed size) now always comes BEFORE Windows.
+  function diskpartLines(table, diskId, recovery){
+    const L = [`select disk ${diskId}`, "clean"];
+    if(table==="gpt"){
+      L.push("convert gpt");
+      L.push("create partition efi size=260");
+      L.push("format quick fs=fat32 label=System");
+      L.push("create partition msr size=16");
+    } else {
+      L.push("convert mbr");
+      L.push("create partition primary size=100");
+      L.push("format quick fs=ntfs label=Boot");
+      L.push("active");
+      L.push("create partition primary size=16");
+      L.push("format quick fs=ntfs label=Reserved");
+    }
+    if(recovery){
+      L.push("create partition primary size=1990");
+      L.push("format quick fs=ntfs label=Recovery");
+      L.push(table==="gpt" ? "set id=de94bba4-06d1-4d40-a16a-bfd50179d6ac" : "set id=27");
+      if(table==="gpt") L.push("gpt attributes=0x8000000000000001");
+    }
+    L.push("create partition primary");
+    L.push("format quick fs=ntfs label=Windows");
+    return L;
+  }
+
+  // Builds ONE chained command that writes every line of the script to WinPE's RAM disk
+  // (X:) — each "echo LINE>>file" is a fully self-contained, plainly-parsed statement,
+  // joined with a bare "&" (no parentheses, no nested "cmd /c", no quoted labels), which
+  // is the standard, reliable way to build a text file from cmd.exe.
+  function writeScriptCommand(lines, filename){
+    return lines.map((l,i)=> `echo ${l}${i===0?">":">>"}X:\\${filename}`).join("&");
+  }
+
+  let diskConfig = "";
+  const diskRunSync = []; // commands that must run BEFORE the bypass/compat ones, in windowsPE
+  let installToPartitionId = "3";
+
+  if(state.diskMode==="universal"){
+    installToPartitionId = state.recoveryPartition ? "4" : "3";
+    const gptLines = diskpartLines("gpt", state.diskId, state.recoveryPartition);
+    const mbrLines = diskpartLines("mbr", state.diskId, state.recoveryPartition);
+    diskRunSync.push(writeScriptCommand(gptLines, "u_gpt.txt"));
+    diskRunSync.push(writeScriptCommand(mbrLines, "u_mbr.txt"));
+    // The SecureBoot\State registry KEY (not a specific value under it) exists only when
+    // WinPE booted via UEFI, regardless of whether Secure Boot itself is on or off — this
+    // is the reliable signal; checking the UEFISecureBootEnabled VALUE gives false negatives
+    // on UEFI machines that simply have Secure Boot turned off.
+    diskRunSync.push(`reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\SecureBoot\\State" >nul 2>&1 && diskpart /s X:\\u_gpt.txt || diskpart /s X:\\u_mbr.txt`);
+    diskConfig = `
+      <ImageInstall>
+        <OSImage>
+          <InstallTo><DiskID>${esc(state.diskId)}</DiskID><PartitionID>${installToPartitionId}</PartitionID></InstallTo>
+          <InstallToAvailablePartition>false</InstallToAvailablePartition>
+        </OSImage>
+
+      </ImageInstall>`;
+  } else if(state.diskMode==="gpt-only" || state.diskMode==="mbr-only"){
+    const gpt = state.diskMode==="gpt-only";
+    const rec = state.recoveryPartition;
+    if(gpt){
+      // Order: EFI(1), MSR(2), [Recovery(3) fixed size], Windows(last, Extend=true)
+      const winOrder = rec ? 4 : 3;
+      installToPartitionId = String(winOrder);
+      diskConfig = `
+      <DiskConfiguration>
+        <Disk wcm:action="add">
+          <DiskID>${esc(state.diskId)}</DiskID>
+          <WillWipeDisk>true</WillWipeDisk>
+          <CreatePartitions>
+            <CreatePartition wcm:action="add"><Order>1</Order><Type>EFI</Type><Size>260</Size></CreatePartition>
+            <CreatePartition wcm:action="add"><Order>2</Order><Type>MSR</Type><Size>16</Size></CreatePartition>
+            ${rec?'<CreatePartition wcm:action="add"><Order>3</Order><Type>Primary</Type><Size>1990</Size></CreatePartition>':""}
+            <CreatePartition wcm:action="add"><Order>${winOrder}</Order><Type>Primary</Type><Extend>true</Extend></CreatePartition>
+          </CreatePartitions>
+          <ModifyPartitions>
+            <ModifyPartition wcm:action="add"><Order>1</Order><PartitionID>1</PartitionID><Format>FAT32</Format><Label>System</Label></ModifyPartition>
+            <ModifyPartition wcm:action="add"><Order>2</Order><PartitionID>2</PartitionID></ModifyPartition>
+            ${rec?'<ModifyPartition wcm:action="add"><Order>3</Order><PartitionID>3</PartitionID><Format>NTFS</Format><Label>Recovery</Label><TypeID>de94bba4-06d1-4d40-a16a-bfd50179d6ac</TypeID></ModifyPartition>':""}
+            <ModifyPartition wcm:action="add"><Order>${winOrder}</Order><PartitionID>${winOrder}</PartitionID><Format>NTFS</Format><Label>Windows</Label></ModifyPartition>
+          </ModifyPartitions>
+        </Disk>
+      </DiskConfiguration>
+      <ImageInstall>
+        <OSImage>
+          <InstallTo><DiskID>${esc(state.diskId)}</DiskID><PartitionID>${winOrder}</PartitionID></InstallTo>
+          <InstallToAvailablePartition>false</InstallToAvailablePartition>
+        </OSImage>
+      </ImageInstall>`;
+    } else {
+      // Order: System Reserved(1), [Recovery(2) fixed size], Windows(last, Extend=true)
+      const winOrder = rec ? 3 : 2;
+      installToPartitionId = String(winOrder);
+      diskConfig = `
+      <DiskConfiguration>
+        <Disk wcm:action="add">
+          <DiskID>${esc(state.diskId)}</DiskID>
+          <WillWipeDisk>true</WillWipeDisk>
+          <CreatePartitions>
+            <CreatePartition wcm:action="add"><Order>1</Order><Type>Primary</Type><Size>100</Size></CreatePartition>
+            ${rec?'<CreatePartition wcm:action="add"><Order>2</Order><Type>Primary</Type><Size>1990</Size></CreatePartition>':""}
+            <CreatePartition wcm:action="add"><Order>${winOrder}</Order><Type>Primary</Type><Extend>true</Extend></CreatePartition>
+          </CreatePartitions>
+          <ModifyPartitions>
+            <ModifyPartition wcm:action="add"><Order>1</Order><PartitionID>1</PartitionID><Format>NTFS</Format><Active>true</Active><Label>System Reserved</Label></ModifyPartition>
+            ${rec?'<ModifyPartition wcm:action="add"><Order>2</Order><PartitionID>2</PartitionID><Format>NTFS</Format><Label>Recovery</Label><TypeID>27</TypeID></ModifyPartition>':""}
+            <ModifyPartition wcm:action="add"><Order>${winOrder}</Order><PartitionID>${winOrder}</PartitionID><Format>NTFS</Format><Label>Windows</Label></ModifyPartition>
+          </ModifyPartitions>
+        </Disk>
+      </DiskConfiguration>
+      <ImageInstall>
+        <OSImage>
+          <InstallTo><DiskID>${esc(state.diskId)}</DiskID><PartitionID>${winOrder}</PartitionID></InstallTo>
+          <InstallToAvailablePartition>false</InstallToAvailablePartition>
+        </OSImage>
+      </ImageInstall>`;
+    }
+  }
+  // diskMode === "manual" → no DiskConfiguration / ImageInstall at all.
+
+  const runSync = [].concat(diskRunSync);
+  if(state.bypassTPM||state.bypassSecureBoot||state.bypassRAM||state.bypassCPU||state.bypassStorage){
+    runSync.push(`reg.exe add HKLM\\SYSTEM\\Setup\\LabConfig /v BypassTPMCheck /t REG_DWORD /d 1 /f`);
+    if(state.bypassSecureBoot) runSync.push(`reg.exe add HKLM\\SYSTEM\\Setup\\LabConfig /v BypassSecureBootCheck /t REG_DWORD /d 1 /f`);
+    if(state.bypassRAM) runSync.push(`reg.exe add HKLM\\SYSTEM\\Setup\\LabConfig /v BypassRAMCheck /t REG_DWORD /d 1 /f`);
+    if(state.bypassStorage) runSync.push(`reg.exe add HKLM\\SYSTEM\\Setup\\LabConfig /v BypassStorageCheck /t REG_DWORD /d 1 /f`);
+    if(state.bypassCPU) runSync.push(`reg.exe add HKLM\\SYSTEM\\Setup\\LabConfig /v BypassCPUCheck /t REG_DWORD /d 1 /f`);
+  }
+  if(state.bypassNRO){
+    runSync.push(`reg.exe add HKLM\\SYSTEM\\Setup\\OOBE /v BypassNRO /t REG_DWORD /d 1 /f`);
+  }
+  if(state.disableNetworkDuringInstall){
+    runSync.push(`reg.exe add HKLM\\SYSTEM\\Setup\\LabConfig /v BypassNetworkCheck /t REG_DWORD /d 1 /f`);
+  }
+
+  let setupComponent = `
+    <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      ${diskConfig}
+      <UserData>
+        <AcceptEula>${state.acceptEula?"true":"false"}</AcceptEula>
+        <FullName>${esc(state.fullName)}</FullName>
+        <Organization>${esc(state.organization)}</Organization>
+        ${state.productKey?`<ProductKey><Key>${esc(state.productKey)}</Key><WillShowUI>OnError</WillShowUI></ProductKey>`:""}
+      </UserData>
+      ${runSync.length?`<RunSynchronous>${runSync.map((c,i)=>`<RunSynchronousCommand wcm:action="add"><Order>${i+1}</Order><Path>cmd.exe /c ${esc(c)}</Path><Description>${esc("Étape "+(i+1))}</Description></RunSynchronousCommand>`).join("")}</RunSynchronous>`:""}
+    </component>`;
+  passes.windowsPE.push(setupComponent);
+
+  /* ---- specialize: shell setup (computer name, timezone, org) + domain join ---- */
+  let shellSpecialize = `
+    <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <ComputerName>${esc(state.computerName||"*")}</ComputerName>
+      <TimeZone>${esc(state.timezone)}</TimeZone>
+      ${state.registeredOwner?`<RegisteredOwner>${esc(state.registeredOwner)}</RegisteredOwner>`:""}
+      ${state.organization?`<RegisteredOrganization>${esc(state.organization)}</RegisteredOrganization>`:""}
+    </component>`;
+  passes.specialize.push(shellSpecialize);
+
+  if(state.joinDomain && state.domainName){
+    passes.specialize.push(`
+    <component name="Microsoft-Windows-UnattendedJoin" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Identification>
+        <Credentials>
+          <Domain>${esc(state.domainName)}</Domain>
+          <Username>${esc(state.domainUser)}</Username>
+          <Password>${esc(state.domainPassword)}</Password>
+        </Credentials>
+        <JoinDomain>${esc(state.domainName)}</JoinDomain>
+        ${state.domainOU?`<MachineObjectOU>${esc(state.domainOU)}</MachineObjectOU>`:""}
+      </Identification>
+    </component>`);
+  }
+
+  // privacy / system tweaks applied via specialize-phase registry through a RunSynchronous on Deployment component
+  const specializeCmds = [];
+  const p = state.privacy, m = state.misc;
+  if(!p.telemetry) specializeCmds.push(`reg add "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection" /v AllowTelemetry /t REG_DWORD /d 0 /f`);
+  if(!p.advertisingId) specializeCmds.push(`reg add "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\AdvertisingInfo" /v DisabledByGroupPolicy /t REG_DWORD /d 1 /f`);
+  if(!p.cortana) specializeCmds.push(`reg add "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search" /v AllowCortana /t REG_DWORD /d 0 /f`);
+  if(!p.locationTracking) specializeCmds.push(`reg add "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\location" /v Value /t REG_SZ /d Deny /f`);
+  if(!p.diagnosticData) specializeCmds.push(`reg add "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection" /v LimitDiagnosticLogCollection /t REG_DWORD /d 1 /f`);
+  if(m.disableDefender) specializeCmds.push(`reg add "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows Defender" /v DisableAntiSpyware /t REG_DWORD /d 1 /f`);
+  if(m.enableRDP){
+    specializeCmds.push(`reg add "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server" /v fDenyTSConnections /t REG_DWORD /d 0 /f`);
+    specializeCmds.push(`netsh advfirewall firewall set rule group="remote desktop" new enable=Yes`);
+  }
+  if(m.disableUAC) specializeCmds.push(`reg add "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System" /v EnableLUA /t REG_DWORD /d 0 /f`);
+  if(m.disableHibernation) specializeCmds.push(`powercfg /hibernate off`);
+  if(m.disableFastStartup) specializeCmds.push(`reg add "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Power" /v HiberbootEnabled /t REG_DWORD /d 0 /f`);
+  if(m.highPerf) specializeCmds.push(`powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c`);
+  if(m.disableWidgets) specializeCmds.push(`reg add "HKLM\\SOFTWARE\\Policies\\Microsoft\\Dsh" /v AllowNewsAndInterests /t REG_DWORD /d 0 /f`);
+  if(m.disableCopilot) specializeCmds.push(`reg add "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsCopilot" /v TurnOffWindowsCopilot /t REG_DWORD /d 1 /f`);
+
+  if(specializeCmds.length){
+    passes.specialize.push(`
+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <RunSynchronous>
+        ${specializeCmds.map((c,i)=>`<RunSynchronousCommand wcm:action="add"><Order>${i+1}</Order><Path>cmd.exe /c ${esc(c)}</Path><Description>${esc("Réglage "+(i+1))}</Description></RunSynchronousCommand>`).join("\n        ")}
+      </RunSynchronous>
+    </component>`);
+  }
+
+  /* ---- oobeSystem: shell setup OOBE / users / autologon / first logon commands ---- */
+  const userAccounts = state.users.filter(u=>u.name.trim()).map(u=>`
+        <LocalAccount wcm:action="add">
+          <Name>${esc(u.name)}</Name>
+          <DisplayName>${esc(u.displayName||u.name)}</DisplayName>
+          <Group>${esc(u.group)}</Group>
+          ${pwdBlock("Password", u.password||"", "Password")}
+        </LocalAccount>`).join("");
+
+  let firstLogon = [];
+  // remove appx packages — package family name fragments matched via wildcard
+  const appxMap = {
+    photos:["Microsoft.Windows.Photos","Microsoft.Photos"],
+    camera:["Microsoft.WindowsCamera"],
+    moviesTV:["Microsoft.ZuneVideo"],
+    grooveMusic:["Microsoft.ZuneMusic"],
+    paint3d:["Microsoft.MSPaint"],
+    print3d:["Microsoft.Print3D"],
+    threeDViewer:["Microsoft.Microsoft3DViewer"],
+    soundRecorder:["Microsoft.WindowsSoundRecorder"],
+    screenSketch:["Microsoft.ScreenSketch"],
+    mailCalendar:["microsoft.windowscommunicationsapps"],
+    skype:["Microsoft.SkypeApp"],
+    teamsConsumer:["MicrosoftTeams","MSTeams"],
+    people:["Microsoft.People"],
+    yourPhone:["Microsoft.YourPhone"],
+    xbox:["Microsoft.XboxApp","Microsoft.XboxGameOverlay","Microsoft.XboxGamingOverlay","Microsoft.XboxIdentityProvider","Microsoft.XboxSpeechToTextOverlay","Microsoft.Xbox.TCUI","Microsoft.GamingApp"],
+    solitaire:["Microsoft.MicrosoftSolitaireCollection"],
+    officeHub:["Microsoft.MicrosoftOfficeHub"],
+    oneNote:["Microsoft.Office.OneNote"],
+    todo:["Microsoft.Todos"],
+    stickyNotes:["Microsoft.MicrosoftStickyNotes"],
+    powerAutomate:["Microsoft.PowerAutomateDesktop"],
+    whiteboard:["Microsoft.Whiteboard"],
+    maps:["Microsoft.WindowsMaps"],
+    weather:["Microsoft.BingWeather"],
+    news:["Microsoft.BingNews"],
+    alarms:["Microsoft.WindowsAlarms"],
+    getHelp:["Microsoft.GetHelp"],
+    feedbackHub:["Microsoft.WindowsFeedbackHub"],
+    tips:["Microsoft.Getstarted"],
+    quickAssist:["MicrosoftCorporationII.QuickAssist"],
+    family:["MicrosoftCorporationII.WindowsFamily","Microsoft.Windows.Family"],
+    mixedReality:["Microsoft.MixedReality.Portal"],
+    clipchamp:["Clipchamp.Clipchamp"],
+    calculator:["Microsoft.WindowsCalculator"],
+  };
+  const pkgsToRemove = [];
+  Object.keys(state.removeApps).forEach(k=>{ if(state.removeApps[k] && appxMap[k]) pkgsToRemove.push(...appxMap[k]); });
+  if(pkgsToRemove.length){
+    const ps = "powershell -NoProfile -ExecutionPolicy Bypass -Command \"" +
+      pkgsToRemove.map(p=>`Get-AppxPackage -allusers *${p}* | Remove-AppxPackage -ErrorAction SilentlyContinue`).join("; ") + "\"";
+    firstLogon.push(ps);
+  }
+  if(state.removeOneDrive){
+    firstLogon.push(`powershell -NoProfile -ExecutionPolicy Bypass -Command "taskkill /f /im OneDrive.exe; if(Test-Path \\"$env:SystemRoot\\SysWOW64\\OneDriveSetup.exe\\"){ Start-Process \\"$env:SystemRoot\\SysWOW64\\OneDriveSetup.exe\\" '/uninstall' -Wait } elseif(Test-Path \\"$env:SystemRoot\\System32\\OneDriveSetup.exe\\"){ Start-Process \\"$env:SystemRoot\\System32\\OneDriveSetup.exe\\" '/uninstall' -Wait }; Remove-Item -Recurse -Force \\"$env:UserProfile\\OneDrive\\" -ErrorAction SilentlyContinue"`);
+  }
+  if(!p.startSuggestions) firstLogon.push(`reg add "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager" /v SystemPaneSuggestionsEnabled /t REG_DWORD /d 0 /f`);
+  if(!p.lockScreenTips) firstLogon.push(`reg add "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager" /v RotatingLockScreenOverlayEnabled /t REG_DWORD /d 0 /f`);
+  if(!p.tailoredExperiences) firstLogon.push(`reg add "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Privacy" /v TailoredExperiencesWithDiagnosticDataEnabled /t REG_DWORD /d 0 /f`);
+  if(!p.activityHistory) firstLogon.push(`reg add "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\System" /v EnableActivityFeed /t REG_DWORD /d 0 /f`);
+  if(!p.speechRecognition) firstLogon.push(`reg add "HKCU\\SOFTWARE\\Microsoft\\Speech_OneCore\\Settings\\OnlineSpeechPrivacy" /v HasAccepted /t REG_DWORD /d 0 /f`);
+  if(!p.feedback) firstLogon.push(`reg add "HKCU\\SOFTWARE\\Microsoft\\Siuf\\Rules" /v NumberOfSIUFInPeriod /t REG_DWORD /d 0 /f`);
+  if(m.showFileExt) firstLogon.push(`reg add "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v HideFileExt /t REG_DWORD /d 0 /f`);
+  if(m.showHidden) firstLogon.push(`reg add "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v Hidden /t REG_DWORD /d 1 /f`);
+  if(!m.darkMode) {} else {
+    firstLogon.push(`reg add "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize" /v AppsUseLightTheme /t REG_DWORD /d 0 /f`);
+    firstLogon.push(`reg add "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize" /v SystemUsesLightTheme /t REG_DWORD /d 0 /f`);
+  }
+  if(m.taskbarLeft) firstLogon.push(`reg add "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarAl /t REG_DWORD /d 0 /f`);
+  if(m.disableLockScreen) firstLogon.push(`reg add "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Personalization" /v NoLockScreen /t REG_DWORD /d 1 /f`);
+
+  // wifi profile (added then connected via netsh)
+  if(state.wifiEnabled && state.wifiSSID){
+    const profileXmlEscaped = `<![CDATA[<?xml version="1.0"?><WLANProfile xmlns="http://www.microsoft.com/networking/WLAN/profile/v1"><name>${state.wifiSSID}</name><SSIDConfig><SSID><hex>${Array.from(state.wifiSSID).map(c=>c.charCodeAt(0).toString(16).padStart(2,"0")).join("")}</hex><name>${state.wifiSSID}</name></SSID>${state.wifiHidden?"<nonBroadcast>true</nonBroadcast>":""}</SSIDConfig><connectionType>ESS</connectionType><connectionMode>auto</connectionMode><MSM><security><authEncryption><authentication>WPA2PSK</authentication><encryption>AES</encryption><useOneX>false</useOneX></authEncryption><sharedKey><keyType>passPhrase</keyType><protected>false</protected><keyMaterial>${state.wifiPassword}</keyMaterial></sharedKey></security></MSM></WLANProfile>]]>`;
+    firstLogon.push(`powershell -NoProfile -Command "$p=${profileXmlEscaped}; Set-Content -Path \\"$env:TEMP\\\\wifi.xml\\" -Value $p; netsh wlan add profile filename=\\"$env:TEMP\\\\wifi.xml\\"; netsh wlan connect name=\\"${esc(state.wifiSSID)}\\""`);
+  }
+
+  // custom commands — unlimited dynamic list, each row may be cmd.exe or PowerShell
+  const customLines = uniq(state.customCommands.map(c=>{
+    const v = (c.value||"").trim();
+    if(!v) return "";
+    if(c.type==="ps"){
+      return `powershell -NoProfile -ExecutionPolicy Bypass -Command "${v.replace(/"/g,'\\"')}"`;
+    }
+    return v;
+  }));
+  firstLogon = firstLogon.concat(customLines);
+
+
+  let oobeShell = `
+    <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <OOBE>
+        <HideEULAPage>true</HideEULAPage>
+        <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
+        <HideOnlineAccountScreens>${state.skipNetworkSetup?"true":"false"}</HideOnlineAccountScreens>
+        <HideWirelessSetupInOOBE>${state.skipNetworkSetup?"true":"false"}</HideWirelessSetupInOOBE>
+        <NetworkLocation>${state.joinDomain?"Work":"Home"}</NetworkLocation>
+        <SkipUserOOBE>true</SkipUserOOBE>
+        <SkipMachineOOB>true</SkipMachineOOB>
+        <ProtectYourPC>3</ProtectYourPC>
+      </OOBE>
+      ${userAccounts?`<UserAccounts><LocalAccounts>${userAccounts}\n      </LocalAccounts></UserAccounts>`:""}
+      ${state.autoLogonUser?`<AutoLogon>
+        <Username>${esc(state.autoLogonUser)}</Username>
+        <Enabled>true</Enabled>
+        <LogonCount>${esc(state.autoLogonCount)}</LogonCount>
+        ${pwdBlock("Password", state.autoLogonPassword||"", "Password")}
+      </AutoLogon>`:""}
+      ${firstLogon.length?`<FirstLogonCommands>
+        ${firstLogon.map((c,i)=>`<SynchronousCommand wcm:action="add"><Order>${i+1}</Order><CommandLine>${esc(c)}</CommandLine><Description>${esc("Commande "+(i+1))}</Description></SynchronousCommand>`).join("\n        ")}
+      </FirstLogonCommands>`:""}
+    </component>`;
+  passes.oobeSystem.push(oobeShell);
+
+  passes.oobeSystem.push(`
+    <component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <InputLocale>${esc(state.inputLocale)}</InputLocale>
+      <SystemLocale>${esc(state.systemLocale)}</SystemLocale>
+      <UILanguage>${esc(state.uiLang)}</UILanguage>
+      <UserLocale>${esc(state.userLocale)}</UserLocale>
+    </component>`);
+
+  /* ---- assemble ---- */
+  const passOrder = ["windowsPE","offlineServicing","generalize","specialize","auditSystem","auditUser","oobeSystem"];
+  const settingsXml = passOrder.filter(p=>passes[p].length).map(p=>
+    `  <settings pass="${p}">${passes[p].join("\n")}\n  </settings>`
+  ).join("\n");
+
+  return `<?xml version="1.0" encoding="utf-8"?>
+<unattend xmlns="urn:schemas-microsoft-com:unattend">
+${settingsXml}
+</unattend>
+`;
+}
+
+/* ============================== SYNTAX HIGHLIGHT (lightweight) ============================== */
+function highlight(xml){
+  let s = esc(xml);
+  s = s.replace(/&lt;(\/?[a-zA-Z0-9:_-]+)/g, '&lt;<span class="tag">$1</span>');
+  s = s.replace(/([a-zA-Z0-9:_-]+)=(&quot;.*?&quot;)/g, '<span class="attr">$1</span>=<span class="val">$2</span>');
+  s = s.replace(/(&lt;!--.*?--&gt;)/g, '<span class="cmt">$1</span>');
+  return s;
+}
+
+function renderXML(){
+  const xml = buildXML();
+  document.getElementById("xmlout").innerHTML = highlight(xml);
+  return xml;
+}
+
+/* ============================== UI BUILDERS ============================== */
+function field(html){ const d=document.createElement("div"); d.className="field"; d.innerHTML=html; return d; }
+
+function toggleRow(key, title, desc, risky, getVal, setVal){
+  const wrap = document.createElement("div");
+  wrap.className = "toggle-row";
+  const checked = getVal();
+  wrap.innerHTML = `
+    <div class="meta">
+      <div class="t">${title}${risky?'<span class="tag-risky">avancé</span>':""}</div>
+      <div class="d">${desc}</div>
+    </div>
+    <label class="switch">
+      <input type="checkbox" ${checked?"checked":""}>
+      <span class="track"><span class="knob"></span></span>
+    </label>`;
+  wrap.querySelector("input").addEventListener("change", e=>{ setVal(e.target.checked); markTouched(activeSection); refresh(); });
+  return wrap;
+}
+
+function markTouched(id){ touched.add(id); }
+
+function tzOptions(){
+  return [
+    ["Romance Standard Time","Paris, Bruxelles, Madrid (UTC+1)"],
+    ["GMT Standard Time","Londres, Dublin (UTC+0)"],
+    ["W. Europe Standard Time","Berlin, Rome, Amsterdam (UTC+1)"],
+    ["Central Europe Standard Time","Varsovie, Budapest, Prague (UTC+1)"],
+    ["E. Europe Standard Time","Bucarest, Sofia (UTC+2)"],
+    ["Eastern Standard Time","New York, Toronto (UTC-5)"],
+    ["Pacific Standard Time","Los Angeles, Vancouver (UTC-8)"],
+    ["Central Standard Time","Chicago, Mexico (UTC-6)"],
+    ["W. Central Africa Standard Time","Lagos, Kinshasa (UTC+1)"],
+    ["Morocco Standard Time","Casablanca, Rabat (UTC+1)"],
+    ["Tokyo Standard Time","Tokyo, Osaka (UTC+9)"],
+    ["China Standard Time","Pékin, Shanghai (UTC+8)"],
+    ["India Standard Time","New Delhi, Mumbai (UTC+5:30)"],
+    ["AUS Eastern Standard Time","Sydney, Melbourne (UTC+10)"],
+    ["UTC","Temps universel coordonné"],
+  ];
+}
+function localeOptions(){
+  return [
+    ["fr-FR","Français (France)"],["fr-CA","Français (Canada)"],["fr-BE","Français (Belgique)"],["fr-CH","Français (Suisse)"],
+    ["en-US","English (United States)"],["en-GB","English (United Kingdom)"],["en-CA","English (Canada)"],
+    ["de-DE","Deutsch (Deutschland)"],["es-ES","Español (España)"],["it-IT","Italiano (Italia)"],
+    ["pt-PT","Português (Portugal)"],["pt-BR","Português (Brasil)"],["nl-NL","Nederlands"],
+    ["pl-PL","Polski"],["ru-RU","Русский"],["ja-JP","日本語"],["zh-CN","中文（简体）"],["ar-SA","العربية"],
+  ];
+}
+function keyboardOptions(){
+  return [["0409:00000409","Anglais (US) — 0409"],["040c:0000040c","Français (AZERTY) — 040c"],["1009:00000409","Français (Canada)"],
+    ["0407:00000407","Allemand (QWERTZ)"],["0410:00000410","Italien"],["040a:0000040a","Espagnol"],["0816:00000816","Portugais"]];
+}
+
+function renderSelect(value, options, onChange){
+  const sel = document.createElement("select");
+  options.forEach(([v,l])=>{ const o=document.createElement("option"); o.value=v; o.textContent=l; if(v===value) o.selected=true; sel.appendChild(o); });
+  sel.addEventListener("change", e=>{ onChange(e.target.value); refresh(); });
+  return sel;
+}
+function renderText(value, placeholder, onChange, isPassword){
+  const wrap = document.createElement("div");
+  if(isPassword){
+    wrap.className="pwd-wrap";
+    const i = document.createElement("input"); i.type="password"; i.value=value||""; i.placeholder=placeholder||"";
+    const btn = document.createElement("button"); btn.type="button"; btn.textContent="afficher";
+    btn.addEventListener("click", ()=>{ i.type = i.type==="password"?"text":"password"; btn.textContent = i.type==="password"?"afficher":"masquer"; });
+    // IMPORTANT: only re-render the XML preview while typing, never the full form —
+    // rebuilding the form's DOM on every keystroke destroys and recreates this very
+    // input, which steals focus after each character.
+    i.addEventListener("input", e=>{ onChange(e.target.value); renderXML(); });
+    wrap.appendChild(i); wrap.appendChild(btn);
+    return wrap;
+  }
+  const i = document.createElement("input"); i.type="text"; i.value=value||""; i.placeholder=placeholder||"";
+  i.addEventListener("input", e=>{ onChange(e.target.value); renderXML(); });
+  return i;
+}
+
+/* ============================== SECTION RENDERERS ============================== */
+const renderers = {};
+
+renderers.lang = (panel)=>{
+  panel.innerHTML = `<h2>01 · Langue & région</h2><p class="sub">Paramètres régionaux appliqués pendant l'installation (windowsPE) et à l'ouverture de session (oobeSystem).</p>`;
+  const r1 = document.createElement("div"); r1.className="row2";
+  const f1 = field('<label class="lab">Langue d\'affichage (UI)</label>'); f1.appendChild(renderSelect(state.uiLang, localeOptions(), v=>{state.uiLang=v; state.systemLocale=v; state.userLocale=v;}));
+  const f2 = field('<label class="lab">Fuseau horaire</label>'); f2.appendChild(renderSelect(state.timezone, tzOptions(), v=>state.timezone=v));
+  r1.appendChild(f1); r1.appendChild(f2);
+  panel.appendChild(r1);
+  const r2 = document.createElement("div"); r2.className="row2";
+  const f3 = field('<label class="lab">Locale système</label>'); f3.appendChild(renderSelect(state.systemLocale, localeOptions(), v=>state.systemLocale=v));
+  const f4 = field('<label class="lab">Locale utilisateur</label>'); f4.appendChild(renderSelect(state.userLocale, localeOptions(), v=>state.userLocale=v));
+  r2.appendChild(f3); r2.appendChild(f4);
+  panel.appendChild(r2);
+  const f5 = field('<label class="lab">Disposition du clavier</label>'); f5.appendChild(renderSelect(state.inputLocale, keyboardOptions(), v=>state.inputLocale=v));
+  panel.appendChild(f5);
+};
+
+renderers.disk = (panel)=>{
+  panel.innerHTML = `<h2>02 · Disque</h2><p class="sub">Partitionnement automatique exécuté en phase windowsPE. Le mode « universel » détecte le micrologiciel de la machine (UEFI ou BIOS legacy) au démarrage de l'installation et applique le bon schéma de partitions — une seule clé USB fonctionne alors sur les deux types de machines.</p>`;
+  const cards = document.createElement("div"); cards.className="radio-cards";
+  const opts = [
+    ["universal","Universel — GPT + MBR (recommandé)","Détecte automatiquement UEFI/Secure Boot ou BIOS legacy via le registre, et partitionne en GPT ou en MBR en conséquence. Une seule clé pour tout type de PC."],
+    ["gpt-only","GPT / UEFI uniquement","Force un partitionnement GPT classique (EFI + MSR + Windows). Échoue sur une machine démarrée en BIOS legacy."],
+    ["mbr-only","MBR / BIOS legacy uniquement","Force un partitionnement MBR classique. Échoue sur une machine démarrée en UEFI pur (sans CSM)."],
+    ["manual","Manuel pendant l'installation","Aucun partitionnement scripté : l'assistant Windows Setup s'affiche normalement."],
+  ];
+  opts.forEach(([v,t,d])=>{
+    const c = document.createElement("label"); c.className="rcard";
+    c.innerHTML = `<input type="radio" name="diskMode" value="${v}" ${state.diskMode===v?"checked":""}><div><div class="t">${t}</div><div class="d">${d}</div></div>`;
+    c.querySelector("input").addEventListener("change",()=>{state.diskMode=v; refresh();});
+    cards.appendChild(c);
+  });
+  panel.appendChild(cards);
+  if(state.diskMode!=="manual"){
+    const r = document.createElement("div"); r.className="row2"; r.style.marginTop="16px";
+    const f1 = field('<label class="lab">ID du disque cible</label>'); f1.appendChild(renderText(state.diskId,"0",v=>state.diskId=v));
+    r.appendChild(f1);
+    panel.appendChild(r);
+    panel.appendChild(toggleRow("recoveryPartition","Créer une partition de récupération","Ajoute une partition Recovery (~1990 Mo, recommandé depuis Windows 11 24H2) séparée de la partition Windows.",false,()=>state.recoveryPartition,v=>state.recoveryPartition=v));
+    if(state.diskMode==="universal"){
+      panel.appendChild(Object.assign(document.createElement("div"),{className:"note info",innerHTML:"<b>Comment ça marche —</b> deux scripts diskpart (un GPT, un MBR) sont écrits sur le disque RAM de Windows PE en une seule commande chaînée (pas de VBScript, pas d'imbrication fragile). Une commande détecte ensuite le micrologiciel via la présence de la clé de registre <code>SecureBoot\\State</code> (fiable même si Secure Boot est désactivé) et lance le bon script. La partition de récupération est toujours créée avant la partition Windows (qui prend le reste de l'espace) pour éviter tout risque de manque d'espace pendant le partitionnement — c'est la cause du message d'erreur « Windows n'a pas pu appliquer le paramètre de démarrage Windows PE » si vous l'avez rencontré avec une version précédente."}));
+    }
+    panel.appendChild(Object.assign(document.createElement("div"),{className:"note",innerHTML:"<b>Attention —</b> le disque ciblé (DiskID) sera entièrement effacé sans confirmation."}));
+  }
+};
+
+renderers.compat = (panel)=>{
+  panel.innerHTML = `<h2>03 · Compatibilité Windows 11</h2><p class="sub">Ajoute les clés de registre <code>LabConfig</code> et <code>BypassNRO</code> avant l'installation, pour contourner certaines vérifications de configuration minimale.</p>`;
+  panel.appendChild(toggleRow("bypassTPM","Ignorer la vérification TPM 2.0","Permet d'installer sur du matériel sans puce TPM 2.0 activée.",true,()=>state.bypassTPM,v=>state.bypassTPM=v));
+  panel.appendChild(toggleRow("bypassSecureBoot","Ignorer la vérification Secure Boot","Permet d'installer même si le démarrage sécurisé est désactivé.",true,()=>state.bypassSecureBoot,v=>state.bypassSecureBoot=v));
+  panel.appendChild(toggleRow("bypassRAM","Ignorer la mémoire minimale (4 Go)","Autorise l'installation sur des machines avec moins de RAM.",true,()=>state.bypassRAM,v=>state.bypassRAM=v));
+  panel.appendChild(toggleRow("bypassStorage","Ignorer l'espace disque minimal (64 Go)","Utile pour les disques système réduits.",true,()=>state.bypassStorage,v=>state.bypassStorage=v));
+  panel.appendChild(toggleRow("bypassCPU","Ignorer la vérification du processeur","Autorise des CPU non listés dans la liste de compatibilité officielle.",true,()=>state.bypassCPU,v=>state.bypassCPU=v));
+  panel.appendChild(toggleRow("bypassNRO","Autoriser un compte local (BypassNRO)","Permet de passer l'étape de connexion à un compte Microsoft dans l'OOBE.",false,()=>state.bypassNRO,v=>state.bypassNRO=v));
+  panel.appendChild(Object.assign(document.createElement("div"),{className:"note",innerHTML:"<b>Note —</b> ces réglages modifient un comportement non officiellement supporté par Microsoft pour ce matériel ; ils sont couramment utilisés pour les machines virtuelles de test ou le matériel légèrement sous les prérequis."}));
+};
+
+const EDITION_PRESETS = [
+  ["", "— clé personnalisée —", ""],
+  ["home", "Windows 10/11 Famille (Home)", "YTMG3-N6DKC-DKB77-7M9GH-8HVX7"],
+  ["pro", "Windows 10/11 Pro", "W269N-WFGWX-YVC9B-4J6C9-T83GX"],
+  ["pron", "Windows 10/11 Pro N", "MH37W-N47XK-V7XM9-C7227-GCQG9"],
+  ["proedu", "Windows 10/11 Pro Education", "6TP4R-GNPTD-KYYHQ-7B7DP-J447Y"],
+  ["prows", "Windows 10/11 Pro pour Stations de travail", "NRG8B-VKK3Q-CXVCJ-9G2XF-6Q84J"],
+  ["edu", "Windows 10/11 Éducation", "NW6C2-QMPVW-D7KKK-3GKT6-VCFB2"],
+  ["ent", "Windows 10/11 Entreprise", "NPPR9-FWDCX-D2C8J-H872K-2YT43"],
+  ["entn", "Windows 10/11 Entreprise N", "DPH2V-TTNVB-4X9Q3-TJR4H-KHJW4"],
+  ["ltsc", "Windows 11 Entreprise LTSC 2024", "M7XTQ-FN8P6-TTKYV-9D4CC-J462D"],
+];
+
+renderers.edition = (panel)=>{
+  panel.innerHTML = `<h2>04 · Édition & licence</h2><p class="sub">Clé de produit et informations d'enregistrement. Les préréglages utilisent les clés génériques publiées par Microsoft pour sélectionner une édition pendant l'installation — elles ne l'activent pas définitivement.</p>`;
+  const presetField = field('<label class="lab">Édition préréglée</label>');
+  presetField.appendChild(renderSelect(state.editionPreset, EDITION_PRESETS.map(([v,l])=>[v,l]), v=>{
+    state.editionPreset = v;
+    const preset = EDITION_PRESETS.find(p=>p[0]===v);
+    if(preset && preset[2]) state.productKey = preset[2];
+    if(v==="") {/* keep current key for manual editing */}
+  }));
+  panel.appendChild(presetField);
+  const f3 = field('<label class="lab">Clé de produit</label><div class="hint">Format XXXXX-XXXXX-XXXXX-XXXXX-XXXXX. Une clé invalide n\'empêche pas l\'installation (<code>WillShowUI=OnError</code>).</div>');
+  f3.appendChild(renderText(state.productKey,"XXXXX-XXXXX-XXXXX-XXXXX-XXXXX",v=>{state.productKey=v.toUpperCase(); state.editionPreset="";}));
+  panel.appendChild(f3);
+  const r = document.createElement("div"); r.className="row2";
+  const f1 = field('<label class="lab">Nom complet</label>'); f1.appendChild(renderText(state.fullName,"Utilisateur",v=>state.fullName=v));
+  const f2 = field('<label class="lab">Organisation</label>'); f2.appendChild(renderText(state.organization,"(optionnel)",v=>state.organization=v));
+  r.appendChild(f1); r.appendChild(f2);
+  panel.appendChild(r);
+  panel.appendChild(toggleRow("acceptEula","Accepter automatiquement le CLUF","Coche l'acceptation du contrat de licence pendant le setup.",false,()=>state.acceptEula,v=>state.acceptEula=v));
+  panel.appendChild(Object.assign(document.createElement("div"),{className:"note info",innerHTML:"<b>Source —</b> clés génériques (GVLK) officielles documentées par Microsoft Learn. La clé Famille n'apparaît pas dans la documentation officielle (Home n'est pas une édition en licence de volume) ; elle provient de sources communautaires largement recoupées et peut nécessiter une activation par une vraie clé ensuite."}));
+};
+
+function userCardHTML(u, idx){
+  return `
+    <button class="rm" data-idx="${idx}" type="button">retirer ✕</button>
+    <div class="row2">
+      <div class="field"><label class="lab">Nom de compte</label><input data-f="name" data-idx="${idx}" type="text" value="${esc(u.name)}" placeholder="Admin"></div>
+      <div class="field"><label class="lab">Nom affiché</label><input data-f="displayName" data-idx="${idx}" type="text" value="${esc(u.displayName)}" placeholder="(identique au nom de compte)"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label class="lab">Mot de passe</label>
+        <div class="pwd-wrap">
+          <input data-f="password" data-idx="${idx}" type="password" value="${esc(u.password)}" placeholder="••••••••">
+          <button type="button" data-pwdtoggle="${idx}">afficher</button>
+        </div>
+      </div>
+      <div class="field"><label class="lab">Groupe</label>
+        <select data-f="group" data-idx="${idx}">
+          <option value="Administrators" ${u.group==="Administrators"?"selected":""}>Administrateurs</option>
+          <option value="Users" ${u.group==="Users"?"selected":""}>Utilisateurs standard</option>
+        </select>
+      </div>
+    </div>`;
+}
+
+renderers.accounts = (panel)=>{
+  panel.innerHTML = `<h2>05 · Comptes utilisateurs</h2><p class="sub">Comptes locaux créés à la première ouverture de session (phase oobeSystem). Ajoutez-en autant que nécessaire.</p>`;
+  const list = document.createElement("div"); list.id="userList";
+  state.users.forEach((u,idx)=>{
+    const c = document.createElement("div"); c.className="user-card"; c.innerHTML = userCardHTML(u, idx);
+    list.appendChild(c);
+  });
+  panel.appendChild(list);
+  const addBtn = document.createElement("button"); addBtn.className="btn-add"; addBtn.type="button"; addBtn.textContent="+ ajouter un compte";
+  addBtn.addEventListener("click",()=>{ state.users.push({name:"",password:"",group:"Users",displayName:""}); refresh(); });
+  panel.appendChild(addBtn);
+
+  list.addEventListener("input", e=>{
+    const f = e.target.getAttribute("data-f"); const idx = e.target.getAttribute("data-idx");
+    if(f!==null && idx!==null){ state.users[idx][f] = e.target.value; renderXML(); }
+  });
+  list.addEventListener("click", e=>{
+    if(e.target.matches("[data-pwdtoggle]")){
+      const idx = e.target.getAttribute("data-pwdtoggle");
+      const inp = e.target.previousElementSibling;
+      inp.type = inp.type==="password"?"text":"password";
+      e.target.textContent = inp.type==="password"?"afficher":"masquer";
+    }
+    if(e.target.matches(".rm")){
+      const idx = +e.target.getAttribute("data-idx");
+      state.users.splice(idx,1); refresh();
+    }
+  });
+
+  const panel2 = document.createElement("div"); panel2.style.marginTop="22px"; panel2.style.paddingTop="18px"; panel2.style.borderTop="1px solid var(--line-soft)";
+  panel2.innerHTML = `<label class="lab" style="margin-bottom:10px;display:block;">Connexion automatique (auto-logon)</label>`;
+  const r = document.createElement("div"); r.className="row2";
+  const f1 = field('<label class="lab">Compte</label>');
+  const sel = renderSelect(state.autoLogonUser, [["",  "— désactivée —"], ...state.users.filter(u=>u.name).map(u=>[u.name,u.name])], v=>state.autoLogonUser=v);
+  f1.appendChild(sel);
+  const f2 = field('<label class="lab">Nombre de connexions auto.</label>'); f2.appendChild(renderText(String(state.autoLogonCount),"1",v=>state.autoLogonCount=v.replace(/\D/g,"")||"1"));
+  r.appendChild(f1); r.appendChild(f2);
+  panel2.appendChild(r);
+  if(state.autoLogonUser){
+    const f3 = field('<label class="lab">Mot de passe du compte auto-logon</label>');
+    f3.appendChild(renderText(state.autoLogonPassword,"••••••••",v=>state.autoLogonPassword=v,true));
+    panel2.appendChild(f3);
+  }
+  panel.appendChild(panel2);
+  panel.appendChild(toggleRow("obscurePasswords","Encoder les mots de passe (base64)","Recommandé : utilise le format attendu par Windows Setup pour les champs Password (réversible, ce n'est pas un chiffrement).",false,()=>state.obscurePasswords,v=>state.obscurePasswords=v));
+  panel.appendChild(Object.assign(document.createElement("div"),{className:"note",innerHTML:"<b>Attention —</b> tout fichier <code>autounattend.xml</code> contenant des mots de passe doit être protégé : le base64 n'est pas un chiffrement et reste trivialement réversible."}));
+};
+
+renderers.computer = (panel)=>{
+  panel.innerHTML = `<h2>06 · Ordinateur & domaine</h2><p class="sub">Identité réseau de la machine, appliquée en phase specialize.</p>`;
+  const r = document.createElement("div"); r.className="row2";
+  const f1 = field('<label class="lab">Nom de l\'ordinateur</label><div class="hint"><code>*</code> génère un nom aléatoire.</div>'); f1.appendChild(renderText(state.computerName,"*",v=>state.computerName=v));
+  const f2 = field('<label class="lab">Propriétaire enregistré</label>'); f2.appendChild(renderText(state.registeredOwner,"(optionnel)",v=>state.registeredOwner=v));
+  r.appendChild(f1); r.appendChild(f2);
+  panel.appendChild(r);
+  panel.appendChild(toggleRow("joinDomain","Joindre un domaine Active Directory","Sinon, la machine reste dans un groupe de travail.",false,()=>state.joinDomain,v=>state.joinDomain=v));
+  if(state.joinDomain){
+    const r2 = document.createElement("div"); r2.className="row2";
+    const d1 = field('<label class="lab">Domaine</label>'); d1.appendChild(renderText(state.domainName,"exemple.local",v=>state.domainName=v));
+    const d2 = field('<label class="lab">Unité d\'organisation (OU)</label>'); d2.appendChild(renderText(state.domainOU,"OU=Postes,DC=exemple,DC=local",v=>state.domainOU=v));
+    r2.appendChild(d1); r2.appendChild(d2);
+    panel.appendChild(r2);
+    const r3 = document.createElement("div"); r3.className="row2";
+    const d3 = field('<label class="lab">Compte de jonction</label>'); d3.appendChild(renderText(state.domainUser,"DOMAINE\\compte",v=>state.domainUser=v));
+    const d4 = field('<label class="lab">Mot de passe</label>'); d4.appendChild(renderText(state.domainPassword,"••••••••",v=>state.domainPassword=v,true));
+    r3.appendChild(d3); r3.appendChild(d4);
+    panel.appendChild(r3);
+    panel.appendChild(Object.assign(document.createElement("div"),{className:"note",innerHTML:"<b>Important —</b> si aucun contrôleur de domaine n'est réellement joignable (VM isolée, réseau sans AD, faute de frappe dans le nom de domaine), Windows Setup reste bloqué plusieurs minutes juste après le premier redémarrage, en essayant de localiser le domaine, avant d'échouer. Ça peut ressembler à un gel. Ne cochez cette option que si la machine peut effectivement atteindre le contrôleur de domaine pendant l'installation."}));
+  } else {
+    const f3 = field('<label class="lab">Groupe de travail</label>'); f3.appendChild(renderText(state.workgroup,"WORKGROUP",v=>state.workgroup=v));
+    panel.appendChild(f3);
+  }
+};
+
+renderers.network = (panel)=>{
+  panel.innerHTML = `<h2>07 · Réseau & Wi-Fi</h2><p class="sub">Contrôle de l'écran réseau de l'OOBE et provisionnement Wi-Fi optionnel.</p>`;
+  panel.appendChild(toggleRow("skipNetworkSetup","Passer l'écran de configuration réseau","Masque les écrans Wi-Fi / compte en ligne de l'OOBE (combiné à BypassNRO).",false,()=>state.skipNetworkSetup,v=>state.skipNetworkSetup=v));
+  panel.appendChild(toggleRow("disableNetworkDuringInstall","Désactiver le réseau pendant l'installation","Empêche Windows Setup de exiger une connexion Internet active.",true,()=>state.disableNetworkDuringInstall,v=>state.disableNetworkDuringInstall=v));
+  panel.appendChild(toggleRow("wifiEnabled","Provisionner un profil Wi-Fi","Ajoute et connecte automatiquement un réseau Wi-Fi via netsh au premier démarrage.",false,()=>state.wifiEnabled,v=>state.wifiEnabled=v));
+  if(state.wifiEnabled){
+    const r = document.createElement("div"); r.className="row2";
+    const f1 = field('<label class="lab">SSID</label>'); f1.appendChild(renderText(state.wifiSSID,"MonReseau",v=>state.wifiSSID=v));
+    const f2 = field('<label class="lab">Mot de passe Wi-Fi (WPA2-PSK)</label>'); f2.appendChild(renderText(state.wifiPassword,"••••••••",v=>state.wifiPassword=v,true));
+    r.appendChild(f1); r.appendChild(f2);
+    panel.appendChild(r);
+    panel.appendChild(toggleRow("wifiHidden","Réseau masqué (SSID non diffusé)","",false,()=>state.wifiHidden,v=>state.wifiHidden=v));
+  }
+};
+
+renderers.privacy = (panel)=>{
+  panel.innerHTML = `<h2>08 · Confidentialité</h2><p class="sub">Chaque option désactivée ajoute une commande de registre exécutée en phase specialize ou au premier logon.</p>`;
+  const labels = {
+    telemetry:["Télémétrie Windows","Réduit le niveau de collecte de diagnostics envoyé à Microsoft."],
+    advertisingId:["ID publicitaire","Empêche les apps d'utiliser l'identifiant publicitaire pour personnaliser les annonces."],
+    locationTracking:["Localisation","Refuse l'accès à la position par défaut."],
+    cortana:["Cortana","Désactive l'assistant vocal Cortana."],
+    tailoredExperiences:["Expériences personnalisées","Désactive l'utilisation des données de diagnostic pour personnaliser des suggestions."],
+    feedback:["Demandes de commentaires","Réduit la fréquence des invites « Envoyer des commentaires »."],
+    speechRecognition:["Reconnaissance vocale en ligne","Désactive l'envoi de données vocales aux services en ligne."],
+    activityHistory:["Historique d'activité","Empêche l'envoi de l'historique d'activité à Microsoft."],
+    startSuggestions:["Suggestions dans le menu Démarrer","Désactive les applications suggérées / sponsorisées."],
+    lockScreenTips:["Astuces sur l'écran de verrouillage","Désactive le contenu Windows Spotlight rotatif."],
+    diagnosticData:["Journaux de diagnostic étendus","Limite la collecte de journaux de diagnostic supplémentaires."],
+  };
+  Object.keys(labels).forEach(k=>{
+    panel.appendChild(toggleRow(k, labels[k][0], labels[k][1], false, ()=>state.privacy[k], v=>state.privacy[k]=v));
+  });
+};
+
+renderers.apps = (panel)=>{
+  panel.innerHTML = `<h2>09 · Applications</h2><p class="sub">Les applications cochées sont désinstallées pour tous les utilisateurs via PowerShell au premier démarrage. Le Microsoft Store et Edge ne sont pas proposés ici : leur suppression casse souvent d'autres composants système (WebView2, dépendances de paquets).</p>`;
+  const categories = [
+    ["Multimédia", {
+      photos:"Photos", camera:"Caméra (Appareil photo)", moviesTV:"Films & TV (Zune Video)", grooveMusic:"Musique Groove (Zune Music)",
+      paint3d:"Paint 3D", print3d:"Print 3D", threeDViewer:"Visionneuse 3D", soundRecorder:"Enregistreur vocal", screenSketch:"Outil Capture d'écran (Snip & Sketch)",
+    }],
+    ["Communication", {
+      mailCalendar:"Courrier et Calendrier", skype:"Skype", teamsConsumer:"Teams (grand public)", people:"Personnes", yourPhone:"Votre téléphone / Liaison de téléphone",
+    }],
+    ["Jeux", {
+      xbox:"Xbox (app, overlay, identity, GamingApp)", solitaire:"Microsoft Solitaire Collection",
+    }],
+    ["Productivité", {
+      officeHub:"Centre Office (raccourci promo)", oneNote:"OneNote (préinstallé)", todo:"Microsoft To Do", stickyNotes:"Notes autocollantes",
+      powerAutomate:"Power Automate Desktop", whiteboard:"Microsoft Whiteboard",
+    }],
+    ["Utilitaires & système", {
+      maps:"Cartes (Maps)", weather:"Météo", news:"Actualités (MSN)", alarms:"Alarmes et horloge", getHelp:"Obtenir de l'aide",
+      feedbackHub:"Hub de commentaires", tips:"Conseils / Mise en route", quickAssist:"Assistance rapide", family:"Sécurité familiale",
+      mixedReality:"Mixed Reality Portal", clipchamp:"Clipchamp", calculator:"Calculatrice",
+    }],
+  ];
+  const toolbar = document.createElement("div"); toolbar.className="apps-toolbar";
+  const all = document.createElement("button"); all.className="btn ghost"; all.type="button"; all.textContent="tout cocher";
+  all.addEventListener("click",()=>{Object.keys(state.removeApps).forEach(k=>state.removeApps[k]=true); refresh();});
+  const none = document.createElement("button"); none.className="btn ghost"; none.type="button"; none.textContent="tout décocher";
+  none.addEventListener("click",()=>{Object.keys(state.removeApps).forEach(k=>state.removeApps[k]=false); refresh();});
+  toolbar.appendChild(all); toolbar.appendChild(none);
+  panel.appendChild(toolbar);
+
+  categories.forEach(([cat, labels])=>{
+    const head = document.createElement("div"); head.className="cat-head"; head.textContent = cat;
+    panel.appendChild(head);
+    const grid = document.createElement("div"); grid.className="checklist";
+    Object.keys(labels).forEach(k=>{
+      const l = document.createElement("label"); l.className="chk";
+      l.innerHTML = `<input type="checkbox" ${state.removeApps[k]?"checked":""}><span>${labels[k]}</span>`;
+      l.querySelector("input").addEventListener("change", e=>{ state.removeApps[k]=e.target.checked; refresh(); });
+      grid.appendChild(l);
+    });
+    panel.appendChild(grid);
+  });
+
+  const headOD = document.createElement("div"); headOD.className="cat-head"; headOD.textContent="Stockage cloud";
+  panel.appendChild(headOD);
+  panel.appendChild(toggleRow("removeOneDrive","Désinstaller OneDrive","Arrête le processus, lance le désinstalleur officiel (OneDriveSetup.exe /uninstall) puis nettoie le dossier utilisateur — traitement différent des autres apps car OneDrive n'est pas un simple paquet AppX.",true,()=>state.removeOneDrive,v=>state.removeOneDrive=v));
+};
+
+let cmdUid = 0;
+function uidCmd(){ return "c"+(++cmdUid); }
+
+renderers.scripts = (panel)=>{
+  panel.innerHTML = `<h2>10 · Commandes personnalisées</h2><p class="sub">Liste illimitée de commandes, exécutées dans l'ordre lors de la première ouverture de session (FirstLogonCommands), après toutes les autres étapes automatiques.</p>`;
+  const list = document.createElement("div"); list.id="cmdList";
+  if(!state.customCommands.length) state.customCommands.push({id:uidCmd(), type:"cmd", value:""});
+
+  state.customCommands.forEach((c, idx)=>{
+    if(!c.id) c.id = uidCmd();
+    const row = document.createElement("div"); row.className="cmd-row";
+    row.innerHTML = `
+      <div class="idx">${String(idx+1).padStart(2,"0")}</div>
+      <select data-cmd="type" data-id="${c.id}">
+        <option value="cmd" ${c.type==="cmd"?"selected":""}>cmd.exe</option>
+        <option value="ps" ${c.type==="ps"?"selected":""}>PowerShell</option>
+      </select>
+      <div class="cmd-main">
+        <textarea data-cmd="value" data-id="${c.id}" placeholder="${c.type==="ps"?'Get-Service spooler | Restart-Service':'icacls C:\\Temp /grant Users:F'}">${esc(c.value)}</textarea>
+      </div>
+      <button class="rm" type="button" data-rm="${c.id}">retirer ✕</button>`;
+    list.appendChild(row);
+  });
+  panel.appendChild(list);
+
+  list.addEventListener("input", e=>{
+    const id = e.target.getAttribute("data-id");
+    const field = e.target.getAttribute("data-cmd");
+    if(!id) return;
+    const item = state.customCommands.find(c=>c.id===id);
+    if(!item) return;
+    if(field==="value"){ item.value = e.target.value; renderXML(); }
+  });
+  list.addEventListener("change", e=>{
+    const id = e.target.getAttribute("data-id");
+    if(e.target.getAttribute("data-cmd")==="type" && id){
+      const item = state.customCommands.find(c=>c.id===id);
+      if(item){ item.type = e.target.value; refresh(); }
+    }
+  });
+  list.addEventListener("click", e=>{
+    const id = e.target.getAttribute("data-rm");
+    if(id){
+      state.customCommands = state.customCommands.filter(c=>c.id!==id);
+      if(!state.customCommands.length) state.customCommands.push({id:uidCmd(), type:"cmd", value:""});
+      refresh();
+    }
+  });
+
+  const addBtn = document.createElement("button"); addBtn.className="btn-add"; addBtn.type="button"; addBtn.textContent="+ ajouter une commande";
+  addBtn.addEventListener("click",()=>{ state.customCommands.push({id:uidCmd(), type:"cmd", value:""}); refresh(); });
+  panel.appendChild(addBtn);
+
+  panel.appendChild(Object.assign(document.createElement("div"),{className:"note info",innerHTML:"<b>Astuce —</b> en mode PowerShell, la commande est automatiquement enveloppée dans <code>powershell -NoProfile -ExecutionPolicy Bypass -Command \"...\"</code>. Préférez les guillemets simples à l'intérieur de votre commande pour éviter les soucis d'échappement."}));
+};
+
+
+renderers.misc = (panel)=>{
+  panel.innerHTML = `<h2>11 · Système & interface</h2><p class="sub">Réglages appliqués en phase specialize (machine) ou au premier logon (utilisateur).</p>`;
+  panel.appendChild(toggleRow("highPerf","Plan d'alimentation Performances élevées","",false,()=>state.misc.highPerf,v=>state.misc.highPerf=v));
+  panel.appendChild(toggleRow("disableHibernation","Désactiver l'hibernation","Libère l'espace disque réservé à hiberfil.sys.",false,()=>state.misc.disableHibernation,v=>state.misc.disableHibernation=v));
+  panel.appendChild(toggleRow("disableFastStartup","Désactiver le démarrage rapide","Utile en dual-boot avec Linux.",false,()=>state.misc.disableFastStartup,v=>state.misc.disableFastStartup=v));
+  panel.appendChild(toggleRow("showFileExt","Afficher les extensions de fichiers","",false,()=>state.misc.showFileExt,v=>state.misc.showFileExt=v));
+  panel.appendChild(toggleRow("showHidden","Afficher les fichiers cachés","",false,()=>state.misc.showHidden,v=>state.misc.showHidden=v));
+  panel.appendChild(toggleRow("darkMode","Activer le thème sombre par défaut","",false,()=>state.misc.darkMode,v=>state.misc.darkMode=v));
+  panel.appendChild(toggleRow("taskbarLeft","Aligner la barre des tâches à gauche","Style Windows 10 plutôt que centré.",false,()=>state.misc.taskbarLeft,v=>state.misc.taskbarLeft=v));
+  panel.appendChild(toggleRow("disableWidgets","Désactiver les widgets / Actualités et centres d'intérêt","",false,()=>state.misc.disableWidgets,v=>state.misc.disableWidgets=v));
+  panel.appendChild(toggleRow("disableCopilot","Désactiver Copilot Windows","",false,()=>state.misc.disableCopilot,v=>state.misc.disableCopilot=v));
+  panel.appendChild(toggleRow("disableLockScreen","Désactiver l'écran de verrouillage","",false,()=>state.misc.disableLockScreen,v=>state.misc.disableLockScreen=v));
+  panel.appendChild(toggleRow("enableRDP","Activer le Bureau à distance","Ouvre aussi la règle de pare-feu correspondante.",false,()=>state.misc.enableRDP,v=>state.misc.enableRDP=v));
+  panel.appendChild(toggleRow("disableUAC","Désactiver le contrôle de compte utilisateur (UAC)","Réduit la sécurité du poste : à réserver aux machines de test isolées.",true,()=>state.misc.disableUAC,v=>state.misc.disableUAC=v));
+  panel.appendChild(toggleRow("disableDefender","Désactiver Microsoft Defender","Déconseillé en production : à réserver aux VM de test sans accès réseau sensible.",true,()=>state.misc.disableDefender,v=>state.misc.disableDefender=v));
+};
+
+renderers.export = (panel)=>{
+  panel.innerHTML = `<h2>12 · Export</h2><p class="sub">Téléchargez <code>autounattend.xml</code> et placez-le à la racine d'une clé USB d'installation (ou dans <code>sources\\$OEM$\\$$\\Panther</code> pour une réutilisation post-installation) pour que Windows Setup le détecte automatiquement.</p>`;
+  const grid = document.createElement("div"); grid.style.cssText="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:18px;";
+  const card1 = document.createElement("div"); card1.className="rcard"; card1.style.cursor="default";
+  card1.innerHTML = `<div><div class="t">📀 Support d'installation USB</div><div class="d">Copiez le fichier sous le nom exact <code>autounattend.xml</code> à la racine de la clé USB bootable.</div></div>`;
+  const card2 = document.createElement("div"); card2.className="rcard"; card2.style.cursor="default";
+  card2.innerHTML = `<div><div class="t">💿 Image ISO personnalisée</div><div class="d">Placez-le à la racine de l'ISO avant gravure, ou injectez-le avec un outil comme oscdimg / NTLite.</div></div>`;
+  grid.appendChild(card1); grid.appendChild(card2);
+  panel.appendChild(grid);
+  const row = document.createElement("div"); row.style.cssText="display:flex; gap:10px; flex-wrap:wrap;";
+  const dl = document.createElement("button"); dl.className="btn primary"; dl.type="button"; dl.textContent="↓ télécharger autounattend.xml";
+  dl.addEventListener("click", doDownload);
+  const cp = document.createElement("button"); cp.className="btn"; cp.type="button"; cp.textContent="copier le xml dans le presse-papiers";
+  cp.addEventListener("click", doCopy);
+  row.appendChild(dl); row.appendChild(cp);
+  panel.appendChild(row);
+  panel.appendChild(Object.assign(document.createElement("div"),{className:"note",innerHTML:"<b>Vérification —</b> relisez le fichier avant usage en production, en particulier les mots de passe et les options « avancé » marquées en orange."}));
+};
+
+/* ============================== RENDER ROOT ============================== */
+function renderNav(){
+  const nav = document.getElementById("stepsNav");
+  nav.innerHTML = "";
+  SECTIONS.forEach((s,i)=>{
+    const b = document.createElement("button");
+    b.type="button";
+    b.setAttribute("aria-current", activeSection===s.id ? "true":"false");
+    b.innerHTML = `<span class="n">${String(i+1).padStart(2,"0")}</span><span>${s.label}</span>`;
+    b.addEventListener("click", ()=>{ activeSection = s.id; touched.add(s.id); refresh(); document.getElementById("formCol").scrollIntoView({behavior:"smooth", block:"start"}); });
+    nav.appendChild(b);
+  });
+}
+
+function renderBootStrip(){
+  const strip = document.getElementById("bootStrip");
+  strip.innerHTML = "";
+  SECTIONS.forEach(s=>{
+    const seg = document.createElement("div");
+    seg.className="boot-seg";
+    seg.dataset.done = touched.has(s.id) ? "1":"0";
+    seg.dataset.active = activeSection===s.id ? "1":"0";
+    seg.title = s.label;
+    seg.addEventListener("click", ()=>{ activeSection = s.id; touched.add(s.id); refresh(); });
+    strip.appendChild(seg);
+  });
+}
+
+function renderForm(){
+  const col = document.getElementById("formCol");
+  col.innerHTML = "";
+  const panel = document.createElement("div"); panel.className="panel";
+  renderers[activeSection](panel);
+  col.appendChild(panel);
+  touched.add(activeSection);
+}
+
+function refresh(){
+  renderNav();
+  renderBootStrip();
+  renderForm();
+  renderXML();
+}
+
+/* ============================== ACTIONS ============================== */
+function doDownload(){
+  const xml = buildXML();
+  const blob = new Blob([xml], {type:"application/xml"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "autounattend.xml";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+function doCopy(){
+  const xml = buildXML();
+  navigator.clipboard.writeText(xml).then(()=>{
+    flashBtns();
+  }).catch(()=>{
+    const ta = document.createElement("textarea"); ta.value = xml; document.body.appendChild(ta);
+    ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
+    flashBtns();
+  });
+}
+function flashBtns(){
+  [document.getElementById("copyBtn"), document.getElementById("copyBtn2")].forEach(b=>{
+    if(!b) return;
+    const orig = b.textContent; b.textContent = "✓ copié"; setTimeout(()=>b.textContent=orig, 1400);
+  });
+}
+
+document.getElementById("downloadBtn").addEventListener("click", doDownload);
+document.getElementById("copyBtn").addEventListener("click", doCopy);
+document.getElementById("copyBtn2").addEventListener("click", doCopy);
+document.getElementById("resetBtn").addEventListener("click", ()=>{
+  if(confirm("Réinitialiser toute la configuration ?")){
+    state = JSON.parse(JSON.stringify(defaultState));
+    touched.clear();
+    activeSection = "lang";
+    refresh();
+  }
+});
+document.getElementById("togglePreview").addEventListener("click", ()=>{
+  document.getElementById("previewCol").classList.toggle("open");
+});
+
+refresh();
+})();
+</script>
+</body>
+</html>
